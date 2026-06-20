@@ -29,3 +29,23 @@ EXCLUDED_OBLASTS = [
 
 # Max reasonable alert duration (14 days in seconds)
 MAX_DURATION_SECONDS = 14 * 24 * 3600  # 1,209,600s
+
+# Season mapping (month → season name)
+SEASON_MAP = {
+    12: "Winter",
+    1: "Winter",
+    2: "Winter",
+    3: "Spring",
+    4: "Spring",
+    5: "Spring",
+    6: "Summer",
+    7: "Summer",
+    8: "Summer",
+    9: "Autumn",
+    10: "Autumn",
+    11: "Autumn",
+}
+
+# Night hours: 22:00–06:00 (inclusive of start, exclusive of end)
+NIGHT_START_HOUR = 22
+NIGHT_END_HOUR = 6
