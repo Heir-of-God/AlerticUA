@@ -1,4 +1,4 @@
-# Air Raid Alert Analysis — Ukraine
+# AlerticUA
 
 A time series analysis project exploring air raid alert patterns in Ukraine using publicly available data. Built as a mini pet-project for an Agentic AI school assignment.
 
@@ -12,7 +12,7 @@ A time series analysis project exploring air raid alert patterns in Ukraine usin
 ## Project Structure
 
 ```
-air-raid-analysis/
+AlerticUA/
 ├── data/
 │   ├── raw/          # Original dataset (CSV)
 │   └── processed/    # Cleaned/transformed data
