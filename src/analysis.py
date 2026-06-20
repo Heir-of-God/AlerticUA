@@ -14,6 +14,11 @@ from src.config import (
 )
 
 
+def _hour_label(h: int) -> str:
+    """Format hour as '7:00-8:00' interval."""
+    return f"{h}:00-{h+1}:00"
+
+
 def alerts_by_oblast(df: pd.DataFrame) -> pd.DataFrame:
     """Total alert count and avg duration per oblast, sorted descending."""
     return (
@@ -35,20 +40,20 @@ def alerts_by_date(df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def _rounded_hour(series: pd.Series) -> pd.Series:
-    """Round timestamp to nearest hour by adding 30 min, then extracting hour."""
-    return (series.dt.tz_convert(None) + pd.Timedelta(minutes=30)).dt.hour
-
-
 def alerts_by_hour(df: pd.DataFrame) -> pd.DataFrame:
-    """Alert count by hour of day (0-23), rounded to nearest hour."""
-    hour = _rounded_hour(df[COL_STARTED])
-    return (
-        df.groupby(hour, observed=True)
+    """Alert count by hour interval [hour, hour+1)."""
+    hour = df[COL_STARTED].dt.tz_convert(None).dt.hour
+    df = df.copy()
+    df["hour"] = hour
+    df["hour_label"] = hour.map(_hour_label)
+    result = (
+        df.groupby(["hour", "hour_label"], observed=True)
         .size()
         .reset_index(name="alert_count")
-        .rename(columns={COL_STARTED: "hour"})
+        .sort_values("hour")
+        .reset_index(drop=True)
     )
+    return result
 
 
 def alerts_by_dayofweek(df: pd.DataFrame) -> pd.DataFrame:
@@ -82,8 +87,8 @@ def alerts_by_season(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def alerts_by_timeofday(df: pd.DataFrame) -> pd.DataFrame:
-    """Alert count: Night (22:00-06:00) vs Day (06:00-22:00), rounded."""
-    hour = _rounded_hour(df[COL_STARTED])
+    """Alert count: Night (22:00-06:00) vs Day (06:00-22:00)."""
+    hour = df[COL_STARTED].dt.tz_convert(None).dt.hour
     df = df.copy()
     df["time_of_day"] = np.where(
         (hour >= NIGHT_START_HOUR) | (hour < NIGHT_END_HOUR),
@@ -132,34 +137,38 @@ def top_alert_days(df: pd.DataFrame, n: int = 10) -> pd.DataFrame:
 
 
 def duration_by_hour(df: pd.DataFrame) -> pd.DataFrame:
-    """Average alert duration by rounded start hour."""
-    hour = _rounded_hour(df[COL_STARTED])
+    """Average alert duration by start hour interval [hour, hour+1)."""
+    hour = df[COL_STARTED].dt.tz_convert(None).dt.hour
+    df = df.copy()
+    df["hour"] = hour
+    df["hour_label"] = hour.map(_hour_label)
     return (
-        df.groupby(hour, observed=True)[COL_DURATION]
+        df.groupby(["hour", "hour_label"], observed=True)[COL_DURATION]
         .agg(["mean", "median", "count"])
         .sort_values("mean", ascending=False)
         .reset_index()
         .rename(
             columns={
-                COL_STARTED: "hour",
+                "hour_label": "interval",
                 "mean": "avg_duration_s",
                 "median": "median_duration_s",
                 "count": "alert_count",
             }
         )
+        .drop(columns=["hour"])
     )
 
 
 def print_hourly_distribution(hour_df: pd.DataFrame) -> None:
     """Print all 24 hours with a visual bar chart."""
-    print("\n--- HOURLY DISTRIBUTION (rounded) ---")
-    print("Hour  | Alerts  | Bar")
-    print("------|---------|-----------------------------")
+    print("\n--- HOURLY DISTRIBUTION ---")
+    print("Interval     | Alerts  | Bar")
+    print("-------------|---------|-----------------------------")
     for _, row in hour_df.iterrows():
-        h = int(row["hour"])
+        label = row["hour_label"]
         count = int(row["alert_count"])
         bar = "█" * (count // 200)
-        print(f"  {h:2d}:00 | {count:>6,} | {bar}")
+        print(f"{label:<12s} | {count:>6,} | {bar}")
     print()
 
 
@@ -193,7 +202,7 @@ def run_analysis(df: pd.DataFrame) -> dict:
 
     print_hourly_distribution(results["by_hour"])
 
-    print("\nTop 5 busiest hours:")
+    print("\nTop 5 busiest intervals:")
     print(
         results["by_hour"]
         .sort_values("alert_count", ascending=False)
@@ -201,7 +210,7 @@ def run_analysis(df: pd.DataFrame) -> dict:
         .to_string(index=False)
     )
 
-    print("\nTop 5 longest avg duration by start hour:")
+    print("\nTop 5 longest avg duration by start interval:")
     print(results["duration_by_hour"].head(5).to_string(index=False))
 
     ds = results["duration_stats"]
