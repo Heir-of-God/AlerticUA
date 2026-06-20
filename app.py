@@ -20,7 +20,7 @@ CONFIG = {
     "text": "#2c3e50",
     "accent": "#c0392b",
     "bar_scale": "Reds",
-    "bar_duration_scale": "blues",
+    "bar_duration_scale": "Blues",
     "season_colors": {
         "Winter": "#a8d8ea",
         "Spring": "#7bc47f",
@@ -62,6 +62,25 @@ CONFIG = {
 
 CFG = CONFIG
 
+tab_style = {
+    "borderBottom": "1px solid #d6d6d6",
+    "padding": "12px",
+    "fontWeight": "bold",
+    "color": "#666",
+    "backgroundColor": CFG["bg"],
+    "borderTop": "none",
+    "borderLeft": "none",
+    "borderRight": "none",
+}
+
+tab_selected_style = {
+    "borderTop": f"3px solid {CFG['accent']}",
+    "borderBottom": "1px solid white",
+    "backgroundColor": "white",
+    "color": CFG["accent"],
+    "padding": "12px",
+    "fontWeight": "bold",
+}
 
 # ── Load data ──────────────────────────────────────────────────────────────
 df = load_and_prepare()
@@ -446,7 +465,7 @@ stat_cards = html.Div(
             [
                 html.H4("Oblasts", style={"margin": "0 0 5px 0", "color": "#666"}),
                 html.Span(
-                    f"{df['oblast'].nunique()}",
+                    f"{df['oblast'].nunique() - 1} oblasts + Kyiv city",
                     style={
                         "fontSize": "28px",
                         "fontWeight": "bold",
@@ -470,7 +489,7 @@ stat_cards = html.Div(
 # ── App layout ─────────────────────────────────────────────────────────────
 
 app = dash.Dash(__name__)
-app.title = "Air Raid Alert Analysis — Ukraine"
+app.title = "AlerticUA"
 
 app.layout = html.Div(
     style={
@@ -481,11 +500,11 @@ app.layout = html.Div(
     },
     children=[
         html.H1(
-            "Air Raid Alert Analysis — Ukraine",
+            "AlerticUA",
             style={"color": CFG["text"], "marginBottom": "5px"},
         ),
         html.P(
-            "Interactive analysis of air raid alert patterns across Ukrainian oblasts (2022–2026)",
+            "Interactive analysis of air raid alert patterns across Ukrainian oblasts (2022-2026)",
             style={"color": "#666", "marginTop": "0", "marginBottom": "20px"},
         ),
         stat_cards,
@@ -509,13 +528,16 @@ app.layout = html.Div(
                             f"Evening alerts (18:00-22:00) last nearly twice as long (~2h) as the average ({ds['mean_s']/60:.0f} min)."
                         ),
                         html.Li(
-                            f"Summer is the busiest season (38,325 alerts), Winter the quietest (24,990)."
+                            f"Though winters are hard for us, Ukrainians, the busiest season is Summer (38,325 alerts) and Winter is the quietest (24,990)."
                         ),
                         html.Li(
                             f"75% of alerts occur during daytime (06:00-22:00), but night alerts last significantly longer."
                         ),
                         html.Li(
-                            f"24 August 2022 — Ukraine's Independence Day — was the single busiest day on record (370 oblasts under alert simultaneously)."
+                            f"24 August 2022 — Ukraine's Independence Day — was the single busiest day on record (370 oblast level alerts in a single day)."
+                        ),
+                        html.Li(
+                            f"Though most alerts start at the daytime, most russian attacks happen at night."
                         ),
                     ],
                     style={
@@ -538,6 +560,8 @@ app.layout = html.Div(
             children=[
                 dcc.Tab(
                     label="Overview",
+                    style=tab_style,
+                    selected_style=tab_selected_style,
                     children=[
                         card(
                             dcc.Graph(figure=fig_oblasts()), title="Regional Breakdown"
@@ -550,6 +574,8 @@ app.layout = html.Div(
                 ),
                 dcc.Tab(
                     label="Hourly Patterns",
+                    style=tab_style,
+                    selected_style=tab_selected_style,
                     children=[
                         card(
                             dcc.Graph(figure=fig_hourly()),
@@ -570,7 +596,7 @@ app.layout = html.Div(
                         html.Div(
                             [
                                 html.P(
-                                    "🗓️ 24-08-2022 — Ukraine's Independence Day, marked by a large-scale Russian missile attack across the country.",
+                                    "🗓️ 24-08-2022 — Ukraine's Independence Day, marked by a large-scale russian missile attack across the country.",
                                     style={
                                         "color": "#666",
                                         "fontSize": "13px",
@@ -594,6 +620,8 @@ app.layout = html.Div(
                 ),
                 dcc.Tab(
                     label="Weekly & Monthly",
+                    style=tab_style,
+                    selected_style=tab_selected_style,
                     children=[
                         card(dcc.Graph(figure=fig_dayofweek()), title="By Day of Week"),
                         card(
@@ -606,6 +634,8 @@ app.layout = html.Div(
                 ),
                 dcc.Tab(
                     label="Duration Analysis",
+                    style=tab_style,
+                    selected_style=tab_selected_style,
                     children=[
                         card(
                             dcc.Graph(figure=fig_duration_oblast()),
@@ -625,8 +655,8 @@ app.layout = html.Div(
         ),
         html.Hr(),
         html.P(
-            "Data source: Vadimkin/ukrainian-air-raid-sirens-dataset · Built for Agentic AI school project",
-            style={"textAlign": "center", "color": "#999", "fontSize": "12px"},
+            "Data source: https://github.com/Vadimkin/ukrainian-air-raid-sirens-dataset.git ··· Built for AlerticUA",
+            style={"textAlign": "center", "color": "#999", "fontSize": "14px"},
         ),
     ],
 )
