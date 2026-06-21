@@ -4,12 +4,14 @@ Run with: python app.py
 """
 
 import dash
-from dash import dcc, html
+from dash import dcc, html, Input, Output
 import plotly.express as px
 import plotly.graph_objects as go
+import pandas as pd
 
 from src.data_loader import load_and_prepare
 from src.analysis import run_analysis, alerts_by_date
+from src.forecasting import run_forecast, FORECAST_DAYS
 from src.config import COL_STARTED, COL_DURATION
 
 CONFIG = {
@@ -85,6 +87,7 @@ tab_selected_style = {
 # ── Load data ──────────────────────────────────────────────────────────────
 df = load_and_prepare()
 results = run_analysis(df)
+forecast_global = {"df": df}  # accessible from callback
 
 ANALYSIS_KEYS = list(results.keys())
 
@@ -651,6 +654,56 @@ app.layout = html.Div(
                         ),
                     ],
                 ),
+                dcc.Tab(
+                    label="Forecast",
+                    style=tab_style,
+                    selected_style=tab_selected_style,
+                    children=[
+                        card(
+                            html.Div(
+                                [
+                                    html.P(
+                                        "Select training cutoff date:",
+                                        style={
+                                            "marginBottom": "10px",
+                                            "fontWeight": "bold",
+                                        },
+                                    ),
+                                    dcc.DatePickerSingle(
+                                        id="cutoff-date-picker",
+                                        min_date_allowed=df[COL_STARTED]
+                                        .min()
+                                        .strftime("%Y-%m-%d"),
+                                        max_date_allowed="2025-09-30",
+                                        initial_visible_month=pd.Timestamp(
+                                            "2025-09-01"
+                                        ),
+                                        date="2025-09-30",
+                                        display_format="DD-MM-YYYY",
+                                        style={"marginBottom": "15px"},
+                                    ),
+                                    html.Div(
+                                        id="forecast-status",
+                                        style={
+                                            "color": "#666",
+                                            "fontSize": "14px",
+                                            "marginBottom": "10px",
+                                        },
+                                    ),
+                                ]
+                            ),
+                            title="Prophet Model Settings",
+                        ),
+                        card(
+                            dcc.Graph(id="forecast-graph"),
+                            title="Daily Alert Forecast (14 days)",
+                        ),
+                        card(
+                            html.Div(id="forecast-table"),
+                            title="Predicted vs Actual (Next 14 Days)",
+                        ),
+                    ],
+                ),
             ],
         ),
         html.Hr(),
@@ -660,6 +713,180 @@ app.layout = html.Div(
         ),
     ],
 )
+
+# ── Callback: Forecast ────────────────────────────────────────────────────
+
+
+@app.callback(
+    [
+        Output("forecast-graph", "figure"),
+        Output("forecast-table", "children"),
+        Output("forecast-status", "children"),
+    ],
+    Input("cutoff-date-picker", "date"),
+)
+def update_forecast(cutoff_date):
+    if not cutoff_date:
+        return go.Figure(), html.P("Select a date above."), ""
+
+    try:
+        result = run_forecast(df, cutoff_date)
+    except Exception as e:
+        return go.Figure(), html.P(f"Error: {e}"), ""
+
+    history = result["history"]
+    pred = result["prediction"]
+    actual = result["actual"]
+
+    cutoff_dt = pd.Timestamp(cutoff_date)
+    forecast_start = cutoff_dt + pd.Timedelta(days=1)
+
+    fig = go.Figure()
+
+    # History (red)
+    fig.add_trace(
+        go.Scatter(
+            x=history["date"],
+            y=history["alert_count"],
+            mode="lines",
+            line=dict(color="red", width=1.5),
+            name="Training data",
+            hovertemplate="%{x|%d-%m-%Y}<br>Alerts: %{y}<extra></extra>",
+        )
+    )
+
+    # Prediction confidence interval (light blue fill)
+    fig.add_trace(
+        go.Scatter(
+            x=pd.concat([pred["ds"], pred["ds"][::-1]]),
+            y=pd.concat([pred["yhat_upper"], pred["yhat_lower"][::-1]]),
+            fill="toself",
+            fillcolor="rgba(68, 100, 255, 0.2)",
+            line=dict(color="rgba(255,255,255,0)"),
+            name="Confidence interval",
+            showlegend=True,
+        )
+    )
+
+    # Prediction (blue)
+    fig.add_trace(
+        go.Scatter(
+            x=pred["ds"],
+            y=pred["yhat"],
+            mode="lines+markers",
+            line=dict(color="blue", width=2),
+            marker=dict(size=6),
+            name="Prediction",
+            hovertemplate="%{x|%d-%m-%Y}<br>Predicted: %{y:.0f}<extra></extra>",
+        )
+    )
+
+    # Actual data for the forecast period (green)
+    if len(actual) > 0:
+        actual_full = actual[actual["date"] >= forecast_start].head(FORECAST_DAYS)
+        if len(actual_full) > 0:
+            fig.add_trace(
+                go.Scatter(
+                    x=actual_full["date"],
+                    y=actual_full["alert_count"],
+                    mode="lines+markers",
+                    line=dict(color="green", width=2, dash="dash"),
+                    marker=dict(size=6),
+                    name="Actual",
+                    hovertemplate="%{x|%d-%m-%Y}<br>Actual: %{y}<extra></extra>",
+                )
+            )
+
+    # Cutoff line
+    fig.add_vline(
+        x=cutoff_dt,
+        line_dash="dot",
+        line_color="gray",
+        annotation_text=f"Cutoff: {cutoff_dt.strftime('%d-%m-%Y')}",
+    )
+
+    fig.update_layout(
+        title=f"Prophet Forecast (cutoff: {cutoff_dt.strftime('%d-%m-%Y')})",
+        xaxis_title="Date",
+        yaxis_title="Number of Alerts",
+        hovermode="x unified",
+        height=500,
+        plot_bgcolor=CFG["plot_bg"],
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    )
+
+    # Table
+    merged = pred[["ds", "yhat", "yhat_lower", "yhat_upper"]].copy()
+    merged["ds"] = merged["ds"].dt.strftime("%d-%m-%Y")
+    merged["yhat"] = merged["yhat"].round(0).astype(int)
+    merged["yhat_lower"] = merged["yhat_lower"].round(0).astype(int)
+    merged["yhat_upper"] = merged["yhat_upper"].round(0).astype(int)
+
+    if len(actual) > 0:
+        actual_map = actual.set_index("date")["alert_count"].to_dict()
+        # Convert actual_map keys to strings (YYYY-MM-DD) for matching
+        actual_map_str = {
+            k.strftime("%Y-%m-%d") if hasattr(k, "strftime") else str(k): v
+            for k, v in actual_map.items()
+        }
+        actual_col = []
+        for _, row in merged.iterrows():
+            dt_str = row["ds"]  # already DD-MM-YYYY
+            # parse to YYYY-MM-DD for lookup
+            try:
+                ymd = pd.to_datetime(dt_str, format="%d-%m-%Y").strftime("%Y-%m-%d")
+                val = actual_map_str.get(ymd, "-")
+            except Exception:
+                val = "-"
+            actual_col.append(val)
+        merged["actual"] = actual_col
+        cols = ["ds", "yhat", "yhat_lower", "yhat_upper", "actual"]
+        headers = ["Date", "Predicted", "Lower", "Upper", "Actual"]
+    else:
+        cols = ["ds", "yhat", "yhat_lower", "yhat_upper"]
+        headers = ["Date", "Predicted", "Lower", "Upper"]
+
+    table = html.Table(
+        style={"width": "100%", "borderCollapse": "collapse"},
+        children=[
+            html.Thead(
+                html.Tr(
+                    [
+                        html.Th(
+                            h,
+                            style={
+                                "textAlign": "left",
+                                "padding": "8px",
+                                "borderBottom": "2px solid #ddd",
+                            },
+                        )
+                        for h in headers
+                    ]
+                )
+            ),
+            html.Tbody(
+                [
+                    html.Tr(
+                        [
+                            html.Td(
+                                str(row[c]),
+                                style={
+                                    "padding": "6px 8px",
+                                    "borderBottom": "1px solid #eee",
+                                },
+                            )
+                            for c in cols
+                        ]
+                    )
+                    for _, row in merged.iterrows()
+                ]
+            ),
+        ],
+    )
+
+    status = f"✅ Trained on {len(history)} days → predicting {FORECAST_DAYS} days from {forecast_start.strftime('%d-%m-%Y')}"
+    return fig, table, status
+
 
 if __name__ == "__main__":
     app.run(debug=True)
