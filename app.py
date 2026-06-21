@@ -11,11 +11,10 @@ import pandas as pd
 
 from src.data_loader import load_and_prepare
 from src.analysis import run_analysis, alerts_by_date
-from src.forecasting import run_forecast, FORECAST_DAYS
+from src.forecasting import run_forecast, run_duration_forecast, FORECAST_DAYS
 from src.config import COL_STARTED, COL_DURATION
 
 CONFIG = {
-    # Colors
     "bg": "#f8faf9",
     "card_bg": "white",
     "plot_bg": "#f6f6f6",
@@ -30,21 +29,15 @@ CONFIG = {
         "Autumn": "#e89b4a",
     },
     "day_night_colors": {"Day": "#f5a623", "Night": "#2c3e50"},
-    # Chart sizes
     "oblast_height": 700,
     "daily_height": 450,
     "chart_height": 400,
     "pie_hole": 0.3,
-    # Duration limits
     "histogram_max_minutes": 600,
     "histogram_nbins": 60,
-    # Time series
     "rolling_window": 7,
-    # Date format
     "date_format": "%d-%m-%Y",
-    # Tables
     "top_days_count": 10,
-    # Day names
     "day_names": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
     "month_names": [
         "Jan",
@@ -61,7 +54,6 @@ CONFIG = {
         "Dec",
     ],
 }
-
 CFG = CONFIG
 
 tab_style = {
@@ -74,7 +66,6 @@ tab_style = {
     "borderLeft": "none",
     "borderRight": "none",
 }
-
 tab_selected_style = {
     "borderTop": f"3px solid {CFG['accent']}",
     "borderBottom": "1px solid white",
@@ -84,15 +75,11 @@ tab_selected_style = {
     "fontWeight": "bold",
 }
 
-# ── Load data ──────────────────────────────────────────────────────────────
 df = load_and_prepare()
 results = run_analysis(df)
-forecast_global = {"df": df}  # accessible from callback
-
 ANALYSIS_KEYS = list(results.keys())
 
 
-# ── Helpers ────────────────────────────────────────────────────────────────
 def card(children, title=None):
     items = []
     if title:
@@ -502,16 +489,12 @@ app.layout = html.Div(
         "fontFamily": "Segoe UI, sans-serif",
     },
     children=[
-        html.H1(
-            "AlerticUA",
-            style={"color": CFG["text"], "marginBottom": "5px"},
-        ),
+        html.H1("AlerticUA", style={"color": CFG["text"], "marginBottom": "5px"}),
         html.P(
             "Interactive analysis of air raid alert patterns across Ukrainian oblasts (2022-2026)",
             style={"color": "#666", "marginTop": "0", "marginBottom": "20px"},
         ),
         stat_cards,
-        # ── Key Insights ────────────────────────────────────────────────
         html.Div(
             [
                 html.H3(
@@ -700,7 +683,15 @@ app.layout = html.Div(
                         ),
                         card(
                             html.Div(id="forecast-table"),
-                            title="Predicted vs Actual (Next 14 Days)",
+                            title="Predicted vs Actual — Alert Count (Next 14 Days)",
+                        ),
+                        card(
+                            dcc.Graph(id="forecast-duration-graph"),
+                            title="Daily Average Duration Forecast (14 days)",
+                        ),
+                        card(
+                            html.Div(id="forecast-duration-table"),
+                            title="Predicted vs Actual — Avg Duration (Next 14 Days)",
                         ),
                     ],
                 ),
@@ -714,48 +705,22 @@ app.layout = html.Div(
     ],
 )
 
+
 # ── Callback: Forecast ────────────────────────────────────────────────────
 
 
-@app.callback(
-    [
-        Output("forecast-graph", "figure"),
-        Output("forecast-table", "children"),
-        Output("forecast-status", "children"),
-    ],
-    Input("cutoff-date-picker", "date"),
-)
-def update_forecast(cutoff_date):
-    if not cutoff_date:
-        return go.Figure(), html.P("Select a date above."), ""
-
-    try:
-        result = run_forecast(df, cutoff_date)
-    except Exception as e:
-        return go.Figure(), html.P(f"Error: {e}"), ""
-
-    history = result["history"]
-    pred = result["prediction"]
-    actual = result["actual"]
-
-    cutoff_dt = pd.Timestamp(cutoff_date)
-    forecast_start = cutoff_dt + pd.Timedelta(days=1)
-
+def _build_fig(history, pred, actual, value_col, cutoff_dt, forecast_start, ylabel):
     fig = go.Figure()
-
-    # History (red)
     fig.add_trace(
         go.Scatter(
             x=history["date"],
-            y=history["alert_count"],
+            y=history[value_col],
             mode="lines",
             line=dict(color="red", width=1.5),
             name="Training data",
-            hovertemplate="%{x|%d-%m-%Y}<br>Alerts: %{y}<extra></extra>",
+            hovertemplate="%{x|%d-%m-%Y}<br>%{y}<extra></extra>",
         )
     )
-
-    # Prediction confidence interval (light blue fill)
     fig.add_trace(
         go.Scatter(
             x=pd.concat([pred["ds"], pred["ds"][::-1]]),
@@ -767,8 +732,6 @@ def update_forecast(cutoff_date):
             showlegend=True,
         )
     )
-
-    # Prediction (blue)
     fig.add_trace(
         go.Scatter(
             x=pred["ds"],
@@ -780,15 +743,13 @@ def update_forecast(cutoff_date):
             hovertemplate="%{x|%d-%m-%Y}<br>Predicted: %{y:.0f}<extra></extra>",
         )
     )
-
-    # Actual data for the forecast period (green)
     if len(actual) > 0:
-        actual_full = actual[actual["date"] >= forecast_start].head(FORECAST_DAYS)
-        if len(actual_full) > 0:
+        af = actual[actual["date"] >= forecast_start].head(FORECAST_DAYS)
+        if len(af) > 0:
             fig.add_trace(
                 go.Scatter(
-                    x=actual_full["date"],
-                    y=actual_full["alert_count"],
+                    x=af["date"],
+                    y=af[value_col],
                     mode="lines+markers",
                     line=dict(color="green", width=2, dash="dash"),
                     marker=dict(size=6),
@@ -796,57 +757,58 @@ def update_forecast(cutoff_date):
                     hovertemplate="%{x|%d-%m-%Y}<br>Actual: %{y}<extra></extra>",
                 )
             )
-
-    # Cutoff line
     fig.add_vline(
         x=cutoff_dt,
         line_dash="dot",
         line_color="gray",
         annotation_text=f"Cutoff: {cutoff_dt.strftime('%d-%m-%Y')}",
     )
-
     fig.update_layout(
-        title=f"Prophet Forecast (cutoff: {cutoff_dt.strftime('%d-%m-%Y')})",
         xaxis_title="Date",
-        yaxis_title="Number of Alerts",
+        yaxis_title=ylabel,
         hovermode="x unified",
         height=500,
         plot_bgcolor=CFG["plot_bg"],
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
+    return fig
 
-    # Table
-    merged = pred[["ds", "yhat", "yhat_lower", "yhat_upper"]].copy()
-    merged["ds"] = merged["ds"].dt.strftime("%d-%m-%Y")
-    merged["yhat"] = merged["yhat"].round(0).astype(int)
-    merged["yhat_lower"] = merged["yhat_lower"].round(0).astype(int)
-    merged["yhat_upper"] = merged["yhat_upper"].round(0).astype(int)
 
+def _build_table(pred, actual, value_col):
+    m = pred[["ds", "yhat", "yhat_lower", "yhat_upper"]].copy()
+    m["ds"] = m["ds"].dt.strftime("%d-%m-%Y")
+    m["yhat"] = m["yhat"].round(0).astype(int)
+    m["yhat_lower"] = m["yhat_lower"].round(0).astype(int)
+    m["yhat_upper"] = m["yhat_upper"].round(0).astype(int)
     if len(actual) > 0:
-        actual_map = actual.set_index("date")["alert_count"].to_dict()
-        # Convert actual_map keys to strings (YYYY-MM-DD) for matching
-        actual_map_str = {
+        am = actual.set_index("date")[value_col].to_dict()
+        ams = {
             k.strftime("%Y-%m-%d") if hasattr(k, "strftime") else str(k): v
-            for k, v in actual_map.items()
+            for k, v in am.items()
         }
-        actual_col = []
-        for _, row in merged.iterrows():
-            dt_str = row["ds"]  # already DD-MM-YYYY
-            # parse to YYYY-MM-DD for lookup
+        ac = []
+        for _, r in m.iterrows():
             try:
-                ymd = pd.to_datetime(dt_str, format="%d-%m-%Y").strftime("%Y-%m-%d")
-                val = actual_map_str.get(ymd, "-")
+                ymd = pd.to_datetime(r["ds"], format="%d-%m-%Y").strftime("%Y-%m-%d")
+                ac.append(ams.get(ymd, "-"))
             except Exception:
-                val = "-"
-            actual_col.append(val)
-        merged["actual"] = actual_col
-        cols = ["ds", "yhat", "yhat_lower", "yhat_upper", "actual"]
-        headers = ["Date", "Predicted", "Lower", "Upper", "Actual"]
+                ac.append("-")
+        m["actual"] = ac
+        cols, hdrs = ["ds", "yhat", "yhat_lower", "yhat_upper", "actual"], [
+            "Date",
+            "Predicted",
+            "Lower",
+            "Upper",
+            "Actual",
+        ]
     else:
-        cols = ["ds", "yhat", "yhat_lower", "yhat_upper"]
-        headers = ["Date", "Predicted", "Lower", "Upper"]
-
-    table = html.Table(
+        cols, hdrs = ["ds", "yhat", "yhat_lower", "yhat_upper"], [
+            "Date",
+            "Predicted",
+            "Lower",
+            "Upper",
+        ]
+    return html.Table(
         style={"width": "100%", "borderCollapse": "collapse"},
         children=[
             html.Thead(
@@ -860,7 +822,7 @@ def update_forecast(cutoff_date):
                                 "borderBottom": "2px solid #ddd",
                             },
                         )
-                        for h in headers
+                        for h in hdrs
                     ]
                 )
             ),
@@ -869,7 +831,7 @@ def update_forecast(cutoff_date):
                     html.Tr(
                         [
                             html.Td(
-                                str(row[c]),
+                                str(r[c]),
                                 style={
                                     "padding": "6px 8px",
                                     "borderBottom": "1px solid #eee",
@@ -878,14 +840,65 @@ def update_forecast(cutoff_date):
                             for c in cols
                         ]
                     )
-                    for _, row in merged.iterrows()
+                    for _, r in m.iterrows()
                 ]
             ),
         ],
     )
 
-    status = f"✅ Trained on {len(history)} days → predicting {FORECAST_DAYS} days from {forecast_start.strftime('%d-%m-%Y')}"
-    return fig, table, status
+
+@app.callback(
+    [
+        Output("forecast-graph", "figure"),
+        Output("forecast-table", "children"),
+        Output("forecast-status", "children"),
+        Output("forecast-duration-graph", "figure"),
+        Output("forecast-duration-table", "children"),
+    ],
+    Input("cutoff-date-picker", "date"),
+)
+def update_forecast(cutoff_date):
+    if not cutoff_date:
+        e = go.Figure(), html.P("Select a date above.")
+        return e[0], e[1], "", e[0], e[1]
+    cutoff_dt = pd.Timestamp(cutoff_date)
+    fs = cutoff_dt + pd.Timedelta(days=1)
+    try:
+        r1 = run_forecast(df, cutoff_date)
+    except Exception as e:
+        return (
+            go.Figure(),
+            html.P(f"Error: {e}"),
+            "",
+            go.Figure(),
+            html.P(f"Error: {e}"),
+        )
+    f1 = _build_fig(
+        r1["history"],
+        r1["prediction"],
+        r1["actual"],
+        "alert_count",
+        cutoff_dt,
+        fs,
+        "Number of Alerts",
+    )
+    t1 = _build_table(r1["prediction"], r1["actual"], "alert_count")
+    st = f"✅ Count: trained on {len(r1['history'])} days → predicting {FORECAST_DAYS} days from {fs.strftime('%d-%m-%Y')}"
+    try:
+        r2 = run_duration_forecast(df, cutoff_date)
+    except Exception as e:
+        return f1, t1, st, go.Figure(), html.P(f"Duration error: {e}")
+    f2 = _build_fig(
+        r2["history"],
+        r2["prediction"],
+        r2["actual"],
+        "avg_duration_s",
+        cutoff_dt,
+        fs,
+        "Avg Duration (seconds)",
+    )
+    t2 = _build_table(r2["prediction"], r2["actual"], "avg_duration_s")
+    return f1, t1, st, f2, t2
 
 
 if __name__ == "__main__":
