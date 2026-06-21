@@ -529,7 +529,7 @@ app.layout = html.Div(
     children=[
         html.H1("AlerticUA", style={"color": CFG["text"], "marginBottom": "5px"}),
         html.P(
-            "Interactive analysis of air raid alert patterns across Ukrainian oblasts (2022-2026)",
+            "Interactive analysis of air raid alert patterns across Ukrainian oblasts (2022-2026). Keep in mind that only oblast level alerts were taken into account",
             style={"color": "#666", "marginTop": "0", "marginBottom": "20px"},
         ),
         stat_cards,
@@ -593,6 +593,20 @@ app.layout = html.Div(
                         card(
                             dcc.Graph(figure=fig_daily_trend()),
                             title="Trends Over Time",
+                        ),
+                        html.Div(
+                            [
+                                html.P(
+                                    "⚠️Note that the data is corrupted after the November of 2025 because then Ukraine decided to swith to mostly rayon's and hromada's air raid alerts",
+                                    style={
+                                        "color": "#666",
+                                        "fontSize": "13px",
+                                        "fontStyle": "italic",
+                                        "margin": "5px 0 0 0",
+                                    },
+                                )
+                            ],
+                            style={"padding": "0 8px"},
                         ),
                     ],
                 ),
@@ -684,6 +698,33 @@ app.layout = html.Div(
                     style=tab_style,
                     selected_style=tab_selected_style,
                     children=[
+                        card(
+                            html.Div(
+                                [
+                                    html.P(
+                                        "This is just a statistical prediction. Which means even if Ukraine completely wins tomorrow "
+                                        "or russia runs out of all planes and missiles, the mathematical model will still show alerts "
+                                        "on all subsequent days. It cannot predict military plans, political decisions, or real-world "
+                                        "intentions — it is just pure statistics and history, nothing more.",
+                                        style={
+                                            "margin": 0,
+                                            "fontSize": "18px",
+                                            "lineHeight": "1.4",
+                                        },
+                                    ),
+                                ],
+                                style={
+                                    "backgroundColor": "#fff3cd",
+                                    "color": "#856404",
+                                    "borderLeft": "4px solid #ffc107",
+                                    "padding": "12px",
+                                    "borderRadius": "4px",
+                                    "marginTop": "10px",
+                                    "marginBottom": "10px",
+                                },
+                            ),
+                            title="⚠️ Important Notice ⚠️",
+                        ),
                         card(
                             html.Div(
                                 [
