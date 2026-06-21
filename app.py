@@ -261,6 +261,44 @@ def fig_duration_hist():
     return fig
 
 
+def fig_heatmap():
+    """Heatmap: day of week x hour interval, colored by alert count."""
+    hour = df[COL_STARTED].dt.tz_convert(None).dt.hour
+    dow = df[COL_STARTED].dt.tz_convert(None).dt.dayofweek
+    labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+    pivot = (
+        df.groupby([dow.rename("dayofweek"), hour.rename("hour")])
+        .size()
+        .reset_index(name="alert_count")
+    )
+
+    pivot["day_label"] = pivot["dayofweek"].map(lambda i: labels[i])
+    pivot["hour_label"] = pivot["hour"].map(lambda h: f"{h}:00-{h+1}:00")
+
+    fig = px.density_heatmap(
+        pivot,
+        x="day_label",
+        y="hour_label",
+        z="alert_count",
+        title="Alert Density: Day of Week × Hour",
+        labels={"day_label": "", "hour_label": "", "alert_count": "Alerts"},
+        color_continuous_scale="Reds",
+        nbinsx=7,
+        nbinsy=24,
+    )
+    fig.update_layout(
+        xaxis={"categoryorder": "array", "categoryarray": labels},
+        yaxis={
+            "categoryorder": "array",
+            "categoryarray": [f"{h}:00-{h+1}:00" for h in range(23, -1, -1)],
+        },
+        height=600,
+        plot_bgcolor=CFG["plot_bg"],
+    )
+    return fig
+
+
 def fig_dayofweek():
     data = results["by_dayofweek"]
     labels = CFG["day_names"]
@@ -609,6 +647,10 @@ app.layout = html.Div(
                     style=tab_style,
                     selected_style=tab_selected_style,
                     children=[
+                        card(
+                            dcc.Graph(figure=fig_heatmap()),
+                            title="Alert Density: Day × Hour",
+                        ),
                         card(dcc.Graph(figure=fig_dayofweek()), title="By Day of Week"),
                         card(
                             dcc.Graph(figure=fig_monthly()),
