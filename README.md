@@ -2,21 +2,26 @@
 
 Interactive time series analysis of air raid alert patterns in Ukraine. Built as a mini pet-project for an Agentic AI school assignment.
 
-## Features
+## 👁️ Dashboard Preview
+
+<img src="docs/assets/preview.gif" alt="AlerticUA Dashboard Demo" width="100%">
+
+## ✨ Features
 
 - **Data Pipeline**: Load, clean, and cache oblast-level air raid alert data
 - **Statistical Analysis**: Alert patterns by region, hour, day of week, month, season, and time of day
 - **Interactive Dashboard**: Dash web app with 5 tabs — Overview, Hourly Patterns, Weekly & Monthly, Duration Analysis, Forecast
-- **Forecasting**: Facebook Prophet model for predicting daily alert counts and average duration (14-day horizon with backtesting)
-- **Key Insights**: Automatically generated narrative highlights
+- **Forecasting**: Facebook Prophet model for predicting daily alert counts and average duration
 
-## Project Structure
+## 📂 Project Structure
 
 ```
 AlerticUA/
 ├── data/
 │   ├── raw/              # Original dataset
 │   └── processed/        # Cleaned/transformed data (gitignored)
+├── docs/
+│   └── assets/           # Dashboard demo GIF
 ├── src/
 │   ├── data_loader.py    # Load & parse CSV, caching
 │   ├── analysis.py       # Statistical analysis
@@ -29,13 +34,19 @@ AlerticUA/
 └── README.md
 ```
 
-## Setup
+## 🚀 Quick Start
 
 1. Create and activate a virtual environment:
 
    ```bash
+   git clone https://github.com/Heir-of-God/AlerticUA.git
+
+   cd AlerticUA
+
    python -m venv .venv
-   .venv\Scripts\activate    # Windows
+
+   # Activate on Windows
+   .venv\Scripts\activate
    ```
 
 2. Install dependencies:
@@ -44,7 +55,7 @@ AlerticUA/
    pip install -r requirements.txt
    ```
 
-## Usage
+## 💻 Usage
 
 ### CLI Analysis
 
@@ -68,17 +79,17 @@ Opens a Dash web app at `http://127.0.0.1:8050` with:
 - **Duration Analysis**: Avg duration by oblast, distribution, by start hour
 - **Forecast**: Prophet model with date picker — predicts next 14 days for both alert count and average duration
 
-## Data Source
+## 📊 Data Source
 
 Dataset: [ukrainian-air-raid-sirens-dataset](https://github.com/Vadimkin/ukrainian-air-raid-sirens-dataset) by Vadimkin.
 
-## Tech Stack
+## 🔨 Tech Stack
 
 - **Python 3.10+**
 - **Dash** (Plotly) — interactive web dashboard
 - **Prophet** (Meta) — time series forecasting
 - **Pandas** — data processing
 
-## License
+## 📄 License
 
-MIT
+This project is licensed under the MIT License - see the LICENSE file for details.
