@@ -25,5 +25,4 @@ Thumbs.db
 
 # Project-specific
 data/processed/
-output/plots/
 *.html
