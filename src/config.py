@@ -1,3 +1,4 @@
+from datetime import date, timedelta
 from pathlib import Path
 
 # Project root
@@ -29,6 +30,16 @@ LEVEL_OBLAST = "oblast"
 EXCLUDED_OBLASTS = [
     "Luhanska oblast",  # permanent siren
 ]
+
+# Oblast-level rows become very sparse after this date (the source switched to
+# raion-level alerts), so forecasts are only evaluated on days up to it
+RELIABLE_UNTIL = date(2025, 7, 31)
+
+# Prophet forecast horizon in days
+FORECAST_DAYS = 14
+
+# Latest forecast cutoff whose whole holdout window is still reliable data
+DEFAULT_CUTOFF_DATE = (RELIABLE_UNTIL - timedelta(days=FORECAST_DAYS)).isoformat()
 
 # Max reasonable alert duration (14 days in seconds)
 MAX_DURATION_SECONDS = 14 * 24 * 3600  # 1,209,600s
