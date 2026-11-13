@@ -93,13 +93,13 @@ def remove_extreme_durations(df: pd.DataFrame) -> pd.DataFrame:
 def print_summary(df: pd.DataFrame) -> None:
     """Print a quick overview of the dataset."""
     print("=" * 60)
-    print("AIR RAID ALERT DATASET — OBLAST LEVEL")
+    print("AIR RAID ALERT DATASET - OBLAST LEVEL")
     print("=" * 60)
     print(f"Records:        {len(df):,}")
-    print(f"Date range:     {df[COL_STARTED].min()}  →  {df[COL_STARTED].max()}")
+    print(f"Date range:     {df[COL_STARTED].min()}  ->  {df[COL_STARTED].max()}")
     print(f"Unique oblasts: {df[COL_OBLAST].nunique()}")
     print(
-        f"Duration range: {df[COL_DURATION].min():.0f}s  →  {df[COL_DURATION].max():.0f}s"
+        f"Duration range: {df[COL_DURATION].min():.0f}s  ->  {df[COL_DURATION].max():.0f}s"
     )
     print(f"Duration mean:  {df[COL_DURATION].mean():.0f}s")
     print(f"Duration median:{df[COL_DURATION].median():.0f}s")

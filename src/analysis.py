@@ -167,7 +167,7 @@ def print_hourly_distribution(hour_df: pd.DataFrame) -> None:
     for _, row in hour_df.iterrows():
         label = row["hour_label"]
         count = int(row["alert_count"])
-        bar = "█" * (count // 200)
+        bar = "#" * (count // 100)
         print(f"{label:<12s} | {count:>6,} | {bar}")
     print()
 
