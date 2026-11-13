@@ -3,10 +3,15 @@ Load, parse, and filter the air raid alert dataset.
 Supports caching: if processed CSV exists, loads it directly (fast).
 """
 
+import hashlib
+import json
+
 import pandas as pd
 from src.config import (
     RAW_DATA_PATH,
     PROCESSED_FILE,
+    PROCESSED_META_FILE,
+    CLEANING_VERSION,
     COL_OBLAST,
     COL_RAION,
     COL_HROMADA,
@@ -105,13 +110,31 @@ def print_summary(df: pd.DataFrame) -> None:
     print("=" * 60)
 
 
+def _raw_fingerprint() -> dict:
+    """Identify the raw file content and cleaning logic a cache was built from."""
+    sha = hashlib.sha256(RAW_DATA_PATH.read_bytes()).hexdigest()
+    return {"raw_sha256": sha, "cleaning_version": CLEANING_VERSION}
+
+
+def _cache_is_fresh(fingerprint: dict) -> bool:
+    """True if the processed CSV exists and matches the current raw file and logic."""
+    if not (PROCESSED_FILE.exists() and PROCESSED_META_FILE.exists()):
+        return False
+    try:
+        return json.loads(PROCESSED_META_FILE.read_text()) == fingerprint
+    except (OSError, ValueError):
+        return False
+
+
 def load_and_prepare() -> pd.DataFrame:
     """
     Full pipeline with caching.
-    If processed CSV exists → load it directly.
-    Otherwise → load raw → filter → clean → save processed CSV.
+    If the processed CSV matches the current raw file and cleaning version,
+    load it directly. Otherwise rebuild it: load raw, deduplicate, filter,
+    clean and save the processed CSV.
     """
-    if PROCESSED_FILE.exists():
+    fingerprint = _raw_fingerprint()
+    if _cache_is_fresh(fingerprint):
         print(f"Loading cached data from {PROCESSED_FILE}")
         df = pd.read_csv(
             PROCESSED_FILE,
@@ -131,6 +154,7 @@ def load_and_prepare() -> pd.DataFrame:
     # Save processed CSV for next time
     PROCESSED_FILE.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(PROCESSED_FILE, index=False)
+    PROCESSED_META_FILE.write_text(json.dumps(fingerprint))
     print(f"Saved processed data to {PROCESSED_FILE}")
 
     print_summary(df)

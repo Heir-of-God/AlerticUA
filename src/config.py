@@ -7,6 +7,10 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 RAW_DATA_PATH = ROOT_DIR / "data" / "raw" / "raw_data_en.csv"
 PROCESSED_DATA_PATH = ROOT_DIR / "data" / "processed"
 PROCESSED_FILE = PROCESSED_DATA_PATH / "oblast_alerts.csv"
+PROCESSED_META_FILE = PROCESSED_DATA_PATH / "oblast_alerts.meta.json"
+
+# Bump when the cleaning steps change so stale caches are rebuilt
+CLEANING_VERSION = 2
 
 # Columns
 COL_OBLAST = "oblast"
