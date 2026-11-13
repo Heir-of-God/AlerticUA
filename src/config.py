@@ -38,6 +38,9 @@ RELIABLE_UNTIL = date(2025, 7, 31)
 # Prophet forecast horizon in days
 FORECAST_DAYS = 14
 
+# Minimum number of training days Prophet needs for a meaningful fit
+MIN_TRAIN_DAYS = 60
+
 # Latest forecast cutoff whose whole holdout window is still reliable data
 DEFAULT_CUTOFF_DATE = (RELIABLE_UNTIL - timedelta(days=FORECAST_DAYS)).isoformat()
 

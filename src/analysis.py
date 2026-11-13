@@ -20,7 +20,7 @@ def to_local(started: pd.Series) -> pd.Series:
     return started.dt.tz_convert(LOCAL_TZ)
 
 
-def _hour_label(h: int) -> str:
+def hour_label(h: int) -> str:
     """Format hour as '7:00-8:00' interval."""
     return f"{h}:00-{h+1}:00"
 
@@ -49,7 +49,7 @@ def alerts_by_hour(df: pd.DataFrame) -> pd.DataFrame:
     hour = to_local(df[COL_STARTED]).dt.hour
     df = df.copy()
     df["hour"] = hour
-    df["hour_label"] = hour.map(_hour_label)
+    df["hour_label"] = hour.map(hour_label)
     result = (
         df.groupby(["hour", "hour_label"], observed=True)
         .size()
@@ -145,7 +145,7 @@ def duration_by_hour(df: pd.DataFrame) -> pd.DataFrame:
     hour = to_local(df[COL_STARTED]).dt.hour
     df = df.copy()
     df["hour"] = hour
-    df["hour_label"] = hour.map(_hour_label)
+    df["hour_label"] = hour.map(hour_label)
     return (
         df.groupby(["hour", "hour_label"], observed=True)[COL_DURATION]
         .agg(["mean", "median", "count"])
@@ -161,6 +161,52 @@ def duration_by_hour(df: pd.DataFrame) -> pd.DataFrame:
         )
         .drop(columns=["hour"])
     )
+
+
+def alerts_by_dayofweek_hour(df: pd.DataFrame) -> pd.DataFrame:
+    """Alert count per (day of week, start hour) cell in local time."""
+    local = to_local(df[COL_STARTED])
+    return (
+        df.groupby(
+            [local.dt.dayofweek.rename("dayofweek"), local.dt.hour.rename("hour")],
+            observed=True,
+        )
+        .size()
+        .reset_index(name="alert_count")
+    )
+
+
+def key_insights(df: pd.DataFrame, results: dict) -> list[str]:
+    """Plain-language highlights computed from the data (nothing hardcoded)."""
+    total = len(df)
+    top3 = results["by_oblast"].head(3)
+    share = top3["alert_count"].sum() / total * 100
+    names = ", ".join(top3[COL_OBLAST].str.replace(" oblast", "", regex=False))
+
+    hour = to_local(df[COL_STARTED]).dt.hour
+    mean_s = df[COL_DURATION].mean()
+    evening = df.loc[(hour >= 18) & (hour < 22), COL_DURATION].mean()
+    night_mask = (hour >= NIGHT_START_HOUR) | (hour < NIGHT_END_HOUR)
+    night_mean = df.loc[night_mask, COL_DURATION].mean()
+    day_mean = df.loc[~night_mask, COL_DURATION].mean()
+
+    tod = results["by_timeofday"].set_index("time_of_day")["alert_count"]
+    seasons = results["by_season"].sort_values("alert_count", ascending=False)
+    top_day = results["top_days"].iloc[0]
+
+    return [
+        f"{names} account for {share:.0f}% of all {total:,} alerts.",
+        f"Alerts starting 18:00-22:00 last {evening / 60:.0f} min on average, "
+        f"versus {mean_s / 60:.0f} min overall.",
+        f"The busiest season is {seasons['season'].iloc[0]} "
+        f"({seasons['alert_count'].iloc[0]:,} alerts) and the quietest is "
+        f"{seasons['season'].iloc[-1]} ({seasons['alert_count'].iloc[-1]:,}).",
+        f"{tod['Day'] / total * 100:.0f}% of alerts start during the day "
+        f"({NIGHT_END_HOUR:02d}:00-{NIGHT_START_HOUR:02d}:00), but night alerts last "
+        f"{night_mean / 60:.0f} min on average versus {day_mean / 60:.0f} min by day.",
+        f"{top_day['date']:%d %B %Y} was the busiest single day "
+        f"({int(top_day['alert_count'])} oblast-level alerts).",
+    ]
 
 
 def print_hourly_distribution(hour_df: pd.DataFrame) -> None:

@@ -15,9 +15,8 @@ from src.config import (
     COL_STARTED,
     DEFAULT_CUTOFF_DATE,
     FORECAST_DAYS,
+    MIN_TRAIN_DAYS,
 )
-
-MIN_TRAIN_DAYS = 60
 
 # cmdstanpy logs every fit at INFO level
 logging.getLogger("cmdstanpy").setLevel(logging.WARNING)
