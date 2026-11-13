@@ -23,6 +23,7 @@ from src.config import (
     LEVEL_OBLAST,
     EXCLUDED_OBLASTS,
     MAX_DURATION_SECONDS,
+    LOCAL_TZ,
 )
 
 
@@ -96,7 +97,8 @@ def print_summary(df: pd.DataFrame) -> None:
     print("AIR RAID ALERT DATASET - OBLAST LEVEL")
     print("=" * 60)
     print(f"Records:        {len(df):,}")
-    print(f"Date range:     {df[COL_STARTED].min()}  ->  {df[COL_STARTED].max()}")
+    started = df[COL_STARTED].dt.tz_convert(LOCAL_TZ)
+    print(f"Date range:     {started.min():%Y-%m-%d}  ->  {started.max():%Y-%m-%d}")
     print(f"Unique oblasts: {df[COL_OBLAST].nunique()}")
     print(
         f"Duration range: {df[COL_DURATION].min():.0f}s  ->  {df[COL_DURATION].max():.0f}s"
