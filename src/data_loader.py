@@ -37,6 +37,20 @@ def load_raw_data() -> pd.DataFrame:
     return df
 
 
+def drop_duplicate_rows(df: pd.DataFrame) -> pd.DataFrame:
+    """Drop exact duplicate rows.
+
+    The bundled raw file is two snapshots of the dataset concatenated, so most
+    rows appear twice and every count would be inflated roughly 2x.
+    """
+    before = len(df)
+    df = df.drop_duplicates().reset_index(drop=True)
+    removed = before - len(df)
+    if removed:
+        print(f"Duplicate rows removed: {removed:,}")
+    return df
+
+
 def filter_oblast_level(df: pd.DataFrame) -> pd.DataFrame:
     """Keep only oblast-level alerts."""
     return df[df[COL_LEVEL] == LEVEL_OBLAST].copy()
@@ -108,6 +122,7 @@ def load_and_prepare() -> pd.DataFrame:
 
     print("Processing raw data (this may take a moment)...")
     df = load_raw_data()
+    df = drop_duplicate_rows(df)
     df = filter_oblast_level(df)
     df = compute_duration(df)
     df = remove_excluded_oblasts(df)
