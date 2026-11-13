@@ -33,6 +33,9 @@ EXCLUDED_OBLASTS = [
 # Max reasonable alert duration (14 days in seconds)
 MAX_DURATION_SECONDS = 14 * 24 * 3600  # 1,209,600s
 
+# Timestamps in the dataset are UTC; hour/weekday/date analysis uses local time
+LOCAL_TZ = "Europe/Kyiv"
+
 # Season mapping (month → season name)
 SEASON_MAP = {
     12: "Winter",
@@ -49,6 +52,6 @@ SEASON_MAP = {
     11: "Autumn",
 }
 
-# Night hours: 22:00–06:00 (inclusive of start, exclusive of end)
+# Night hours in local time: 22:00-06:00 (inclusive of start, exclusive of end)
 NIGHT_START_HOUR = 22
 NIGHT_END_HOUR = 6

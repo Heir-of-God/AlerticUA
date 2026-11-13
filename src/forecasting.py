@@ -6,7 +6,7 @@ Predicts daily alert counts / avg duration and compares with actual data.
 import pandas as pd
 from prophet import Prophet
 
-from src.analysis import alerts_by_date
+from src.analysis import alerts_by_date, to_local
 from src.data_loader import load_and_prepare
 from src.config import COL_DURATION, COL_STARTED
 
@@ -75,7 +75,7 @@ def run_duration_forecast(df, cutoff_date):
     Returns {history, prediction, actual} with 'avg_duration_s' as the value column.
     """
     df = df.copy()
-    day = df[COL_STARTED].dt.tz_convert(None).dt.date
+    day = to_local(df[COL_STARTED]).dt.tz_localize(None).dt.normalize()
     daily_dur = (
         df.groupby(day, observed=True)[COL_DURATION]
         .mean()

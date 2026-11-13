@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 import pandas as pd
 
 from src.data_loader import load_and_prepare
-from src.analysis import run_analysis, alerts_by_date
+from src.analysis import run_analysis, alerts_by_date, to_local
 from src.forecasting import run_forecast, run_duration_forecast, FORECAST_DAYS
 from src.config import COL_STARTED, COL_DURATION
 
@@ -169,7 +169,7 @@ def fig_hourly():
         data,
         x="hour_label",
         y="alert_count",
-        title="Alerts by Hour Interval",
+        title="Alerts by Hour Interval (Kyiv time)",
         labels={"hour_label": "", "alert_count": "Alerts"},
         color="alert_count",
         color_continuous_scale=CFG["bar_scale"],
@@ -263,8 +263,8 @@ def fig_duration_hist():
 
 def fig_heatmap():
     """Heatmap: day of week x hour interval, colored by alert count."""
-    hour = df[COL_STARTED].dt.tz_convert(None).dt.hour
-    dow = df[COL_STARTED].dt.tz_convert(None).dt.dayofweek
+    hour = to_local(df[COL_STARTED]).dt.hour
+    dow = to_local(df[COL_STARTED]).dt.dayofweek
     labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
     pivot = (
@@ -617,7 +617,7 @@ app.layout = html.Div(
                     children=[
                         card(
                             dcc.Graph(figure=fig_hourly()),
-                            title="Alert Frequency by Hour",
+                            title="Alert Frequency by Hour (Kyiv time)",
                         ),
                         card(
                             dcc.Graph(figure=fig_duration_by_hour()),

@@ -11,7 +11,13 @@ from src.config import (
     SEASON_MAP,
     NIGHT_START_HOUR,
     NIGHT_END_HOUR,
+    LOCAL_TZ,
 )
+
+
+def to_local(started: pd.Series) -> pd.Series:
+    """Convert UTC start timestamps to Europe/Kyiv local time (tz-aware)."""
+    return started.dt.tz_convert(LOCAL_TZ)
 
 
 def _hour_label(h: int) -> str:
@@ -30,19 +36,17 @@ def alerts_by_oblast(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def alerts_by_date(df: pd.DataFrame) -> pd.DataFrame:
-    """Daily alert count across all oblasts."""
-    date_col = df[COL_STARTED].dt.tz_convert(None).dt.date
-    return (
-        df.groupby(date_col, observed=True)
-        .size()
-        .reset_index(name="alert_count")
-        .rename(columns={COL_STARTED: "date"})
-    )
+    """Daily alert count (local dates) across all oblasts; days with no alerts get 0."""
+    local = to_local(df[COL_STARTED])
+    counts = local.dt.tz_localize(None).dt.normalize().value_counts()
+    full_range = pd.date_range(counts.index.min(), counts.index.max(), freq="D")
+    daily = counts.reindex(full_range, fill_value=0).sort_index()
+    return daily.rename_axis("date").reset_index(name="alert_count")
 
 
 def alerts_by_hour(df: pd.DataFrame) -> pd.DataFrame:
     """Alert count by hour interval [hour, hour+1)."""
-    hour = df[COL_STARTED].dt.tz_convert(None).dt.hour
+    hour = to_local(df[COL_STARTED]).dt.hour
     df = df.copy()
     df["hour"] = hour
     df["hour_label"] = hour.map(_hour_label)
@@ -58,7 +62,7 @@ def alerts_by_hour(df: pd.DataFrame) -> pd.DataFrame:
 
 def alerts_by_dayofweek(df: pd.DataFrame) -> pd.DataFrame:
     """Alert count by day of week (0=Monday, 6=Sunday)."""
-    dow = df[COL_STARTED].dt.tz_convert(None).dt.dayofweek
+    dow = to_local(df[COL_STARTED]).dt.dayofweek
     return (
         df.groupby(dow, observed=True)
         .size()
@@ -69,7 +73,7 @@ def alerts_by_dayofweek(df: pd.DataFrame) -> pd.DataFrame:
 
 def alerts_by_month(df: pd.DataFrame) -> pd.DataFrame:
     """Alert count by month (1-12), aggregated across all years."""
-    month = df[COL_STARTED].dt.tz_convert(None).dt.month
+    month = to_local(df[COL_STARTED]).dt.month
     return (
         df.groupby(month, observed=True)
         .size()
@@ -80,7 +84,7 @@ def alerts_by_month(df: pd.DataFrame) -> pd.DataFrame:
 
 def alerts_by_season(df: pd.DataFrame) -> pd.DataFrame:
     """Alert count by season (Winter/Spring/Summer/Autumn)."""
-    month = df[COL_STARTED].dt.tz_convert(None).dt.month
+    month = to_local(df[COL_STARTED]).dt.month
     df = df.copy()
     df["season"] = month.map(SEASON_MAP)
     return df.groupby("season", observed=True).size().reset_index(name="alert_count")
@@ -88,7 +92,7 @@ def alerts_by_season(df: pd.DataFrame) -> pd.DataFrame:
 
 def alerts_by_timeofday(df: pd.DataFrame) -> pd.DataFrame:
     """Alert count: Night (22:00-06:00) vs Day (06:00-22:00)."""
-    hour = df[COL_STARTED].dt.tz_convert(None).dt.hour
+    hour = to_local(df[COL_STARTED]).dt.hour
     df = df.copy()
     df["time_of_day"] = np.where(
         (hour >= NIGHT_START_HOUR) | (hour < NIGHT_END_HOUR),
@@ -138,7 +142,7 @@ def top_alert_days(df: pd.DataFrame, n: int = 10) -> pd.DataFrame:
 
 def duration_by_hour(df: pd.DataFrame) -> pd.DataFrame:
     """Average alert duration by start hour interval [hour, hour+1)."""
-    hour = df[COL_STARTED].dt.tz_convert(None).dt.hour
+    hour = to_local(df[COL_STARTED]).dt.hour
     df = df.copy()
     df["hour"] = hour
     df["hour_label"] = hour.map(_hour_label)
